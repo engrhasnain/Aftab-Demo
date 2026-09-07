@@ -19,6 +19,35 @@ The sidebar folds down to a rail of icons with the button in its header, and
 opens again the same way. On a narrow screen it becomes a drawer behind a
 **Menu** button instead.
 
+## Putting it online
+
+The code lives at <https://github.com/engrhasnain/Aftab-Demo> and the demo is
+deployed from there through Vercel. Vercel watches the repository, so every push
+to `main` rebuilds and republishes the site on its own — there is nothing to
+upload by hand.
+
+To set it up the first time:
+
+1. Sign in at <https://vercel.com> with the GitHub account that owns the
+   repository.
+2. **Add New -> Project**, then import `Aftab-Demo`.
+3. Vercel recognises Vite and fills everything in: build command `vite build`,
+   output directory `dist`. Leave it as it found it.
+4. **Deploy.** It takes about a minute, and the link appears when it finishes.
+
+The link comes out as `https://aftab-demo.vercel.app` (or whatever project name
+you accept on the way through). It can be renamed later under
+**Settings -> Domains**, and a real domain can be pointed at it there too.
+
+One file matters for this: [vercel.json](vercel.json). There is no file sitting
+at `/suppliers` — the app invents that address as you click — so a refresh, or a
+link you send someone, would otherwise land on a Vercel 404. The rewrite in that
+file hands every unknown address to the app, which then opens the right screen.
+
+Anyone with the link can open it. Each visitor gets their own copy of the demo
+data in their own browser; nothing they type is sent anywhere, stored on a
+server, or visible to anyone else.
+
 ## What to show in a demo
 
 1. **Dashboard** — the six summary cards, the 7-day sales chart, recent activity.
