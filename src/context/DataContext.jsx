@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import seedData, { defaultSettings } from '../data/seedData'
-import { TODAY } from '../utils/format'
+import { roundMoney, TODAY } from '../utils/format'
 import { calcLine, calcTotals } from '../utils/tax'
+import { cashOutForPayroll, payrollProblem } from '../utils/payroll'
 
 const round2 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100
 
@@ -33,7 +34,7 @@ const DataContext = createContext(null)
  * else can see it. That is what the real build replaces.
  */
 const STORAGE_KEY = 'raso-demo-state'
-const STORAGE_VERSION = 4
+const STORAGE_VERSION = 5
 
 function loadSaved(fallback) {
   if (typeof window === 'undefined' || !window.localStorage) return fallback
@@ -101,6 +102,21 @@ function applyToBatches(stockBatches, changes) {
   })
 }
 
+/** Shapes the fields an employee form sends into a stored employee. */
+function employeeFields(fields) {
+  return {
+    name: fields.name,
+    designation: fields.designation,
+    monthlySalary: Number(fields.monthlySalary),
+    phone: fields.phone || '',
+    cnic: fields.cnic || '',
+    address: fields.address || '',
+    joinedDate: fields.joinedDate || TODAY,
+    booksSales: Boolean(fields.booksSales),
+    delivers: Boolean(fields.delivers),
+  }
+}
+
 /** Shapes the fields a product form sends into a stored product. */
 function productFields(fields) {
   return {
@@ -146,6 +162,7 @@ export const initialState = {
   purchases: seedData.purchases,
   sales: seedData.sales,
   employees: seedData.employees,
+  salaryPayments: seedData.salaryPayments,
   cashEntries: seedData.cashEntries,
   adjustments: seedData.adjustments,
   expenses: seedData.expenses,
@@ -281,9 +298,9 @@ export function reducer(state, action) {
       const employee = {
         id: nextId('emp', state.employees, 1, 2),
         code: nextCode(state.employees, series.employee),
-        name: action.payload.name,
-        designation: action.payload.designation,
-        monthlySalary: Number(action.payload.monthlySalary),
+        ...employeeFields(action.payload),
+        leftDate: null,
+        status: 'active',
       }
       return {
         ...state,
@@ -296,17 +313,22 @@ export function reducer(state, action) {
       const { id, ...fields } = action.payload
       return {
         ...state,
+        employees: state.employees.map((e) => (e.id === id ? { ...e, ...employeeFields(fields) } : e)),
+        lastCreated: { type: 'employee', id },
+      }
+    }
+
+    /* Somebody leaving is a change of state, never a deletion — every invoice
+       and delivery they handled still has to carry their name. */
+    case 'SET_EMPLOYEE_STATUS': {
+      const { id, status, leftDate } = action.payload
+      return {
+        ...state,
         employees: state.employees.map((e) =>
           e.id === id
-            ? {
-                ...e,
-                name: fields.name,
-                designation: fields.designation,
-                monthlySalary: Number(fields.monthlySalary),
-              }
+            ? { ...e, status, leftDate: status === 'left' ? leftDate || TODAY : null }
             : e,
         ),
-        lastCreated: { type: 'employee', id },
       }
     }
 
@@ -853,7 +875,7 @@ export function reducer(state, action) {
     /* ---------------- sales ---------------- */
 
     case 'RECORD_SALE': {
-      const { customerId, saleDate, paymentStatus, items } = action.payload
+      const { customerId, saleDate, paymentStatus, items, bookedBy, deliveredBy } = action.payload
 
       // Work the tax out now and store it on the invoice. If the business
       // changes its tax setting next month, this invoice must not change.
@@ -897,6 +919,8 @@ export function reducer(state, action) {
         customerId,
         saleDate,
         paymentStatus,
+        bookedBy: bookedBy || null,
+        deliveredBy: deliveredBy || null,
         status: 'active',
         items: priced,
         subtotal: totals.subtotal,
@@ -1029,23 +1053,49 @@ export function reducer(state, action) {
 
     /* ---------------- salaries ---------------- */
 
-    case 'PAY_SALARY': {
-      const employee = state.employees.find((e) => e.id === action.payload.employeeId)
-      if (!employee) return state
-      return {
-        ...state,
-        cashEntries: [
-          ...state.cashEntries,
-          makeCashEntry(state.cashEntries, {
-            entryDate: action.payload.entryDate,
-            direction: 'out',
-            amount: employee.monthlySalary,
-            referenceType: 'salary',
-            referenceId: employee.id,
-            note: 'Salary — ' + employee.name,
-          }),
-        ],
+    /**
+     * One action covers the whole of payroll: a payment against the month, an
+     * advance handed over early, or an adjustment for overtime or absence.
+     *
+     * The rule check runs here rather than only on the screen, so paying
+     * somebody twice, paying more than is owed, or taking back an advance that
+     * was never given is refused even if the button somehow gets clicked.
+     */
+    case 'RECORD_PAYROLL': {
+      const { employeeId, month, kind, amount, advanceRecovered = 0, note = '', entryDate } = action.payload
+      const employee = state.employees.find((e) => e.id === employeeId)
+      if (payrollProblem({ employee, records: state.salaryPayments, month, kind, amount, advanceRecovered })) {
+        return state
       }
+
+      const record = {
+        id: nextId('pay', state.salaryPayments, 1, 3),
+        employeeId,
+        month,
+        entryDate: entryDate || TODAY,
+        kind,
+        amount: roundMoney(amount),
+        advanceRecovered: kind === 'salary' ? roundMoney(advanceRecovered) : 0,
+        note,
+      }
+
+      // An adjustment moves no money; it only changes what is owed.
+      const cashOut = cashOutForPayroll(record)
+      const cashEntries = cashOut
+        ? [
+            ...state.cashEntries,
+            makeCashEntry(state.cashEntries, {
+              entryDate: record.entryDate,
+              direction: 'out',
+              amount: cashOut,
+              referenceType: 'salary',
+              referenceId: employee.id,
+              note: (kind === 'advance' ? 'Salary advance — ' : 'Salary — ') + employee.name,
+            }),
+          ]
+        : state.cashEntries
+
+      return { ...state, salaryPayments: [...state.salaryPayments, record], cashEntries }
     }
 
     default:
@@ -1106,8 +1156,9 @@ export function DataProvider({ children }) {
 
       writeOffBatch: (payload) => dispatch({ type: 'WRITE_OFF_BATCH', payload: { date: TODAY, ...payload } }),
 
-      paySalary: (employeeId, entryDate = TODAY) =>
-        dispatch({ type: 'PAY_SALARY', payload: { employeeId, entryDate } }),
+      recordPayroll: (payload) => dispatch({ type: 'RECORD_PAYROLL', payload }),
+      setEmployeeStatus: (id, status, leftDate = TODAY) =>
+        dispatch({ type: 'SET_EMPLOYEE_STATUS', payload: { id, status, leftDate } }),
     }),
     [state],
   )

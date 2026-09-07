@@ -1,5 +1,5 @@
 import { parseISO, roundMoney, toISO, TODAY } from './format'
-import { activePurchases, activeSales, customerName, getProduct, groupName } from './selectors'
+import { activePurchases, activeSales, customerName, employeeName, getProduct, groupName } from './selectors'
 
 /**
  * Everything the Reports screen needs, kept apart from the day-to-day selectors
@@ -216,6 +216,24 @@ export function buildReport(data, from, to) {
     byCustomer.set(sale.customerId, row)
   }
 
+  /* Who sold what. An invoice with nobody's name on it still counts towards the
+     company total, so it is shown as its own row rather than being dropped —
+     otherwise the parts would not add up to the whole. */
+  const bySeller = new Map()
+  for (const sale of sales) {
+    const key = sale.bookedBy || 'unattributed'
+    const row = bySeller.get(key) || {
+      id: key,
+      name: sale.bookedBy ? employeeName(data, sale.bookedBy) : 'Not booked to anyone',
+      value: 0,
+      orders: 0,
+      to: sale.bookedBy ? `/employees/${sale.bookedBy}` : undefined,
+    }
+    row.value += sale.totalAmount
+    row.orders += 1
+    bySeller.set(key, row)
+  }
+
   const rank = (rows) => [...rows].sort((a, b) => b.value - a.value)
   const busiest = series.reduce((best, b) => (b.sales > (best ? best.sales : 0) ? b : best), null)
 
@@ -244,6 +262,7 @@ export function buildReport(data, from, to) {
     unitsSold: sales.reduce((t, s) => t + s.items.reduce((n, i) => n + i.qty, 0), 0),
     topProducts: rank([...byProduct.values()]).slice(0, 6),
     topCustomers: rank([...byCustomer.values()]).slice(0, 6),
+    bySeller: rank([...bySeller.values()]),
     byGroup: rank([...byGroup.entries()].map(([name, value]) => ({ name, value }))).slice(0, 8),
     busiestDay: busiest && busiest.sales > 0 ? busiest : null,
   }

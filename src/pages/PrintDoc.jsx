@@ -2,6 +2,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import {
   customerName,
+  employeeName,
   getBatch,
   getCustomer,
   getProduct,
@@ -296,16 +297,22 @@ export default function PrintDoc() {
           </p>
         ) : null}
 
-        {/* ---------- signatures ---------- */}
+        {/* ---------- signatures ----------
+            Where the system knows who did the work, the name is printed under
+            the line. A challan that carries the driver's name is what settles
+            an argument about a delivery that supposedly never arrived. */}
         <footer className="mt-12 grid grid-cols-3 gap-8 text-sm">
-          {['Prepared by', 'Delivered by', isSaleSide ? 'Received by (customer stamp)' : 'Authorised by'].map(
-            (role) => (
-              <div key={role}>
-                <div className="h-12 border-b border-slate-500" />
-                <p className="mt-1 text-slate-600">{role}</p>
-              </div>
-            ),
-          )}
+          {[
+            { role: 'Prepared by', name: sale && sale.bookedBy ? employeeName(data, sale.bookedBy) : null },
+            { role: 'Delivered by', name: sale && sale.deliveredBy ? employeeName(data, sale.deliveredBy) : null },
+            { role: isSaleSide ? 'Received by (customer stamp)' : 'Authorised by', name: null },
+          ].map((slot) => (
+            <div key={slot.role}>
+              <div className="h-12 border-b border-slate-500" />
+              <p className="mt-1 text-slate-600">{slot.role}</p>
+              {slot.name ? <p className="font-semibold text-slate-900">{slot.name}</p> : null}
+            </div>
+          ))}
         </footer>
 
         <p className="mt-6 border-t border-slate-300 pt-2 text-center text-xs text-slate-500">

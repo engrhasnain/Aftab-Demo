@@ -406,6 +406,20 @@ export default function Reports() {
 
             <Card>
               <CardHeader
+                title="Who sold what"
+                subtitle={`Invoices counted against the person who booked them, in ${report.label}. Click a name to open their page.`}
+              />
+              <RankBars
+                rows={report.bySeller.map((row) => ({
+                  ...row,
+                  detail: `${row.orders} invoice${row.orders === 1 ? '' : 's'}`,
+                }))}
+                emptyText="Nothing was sold in this period."
+              />
+            </Card>
+
+            <Card>
+              <CardHeader
                 title="Which kinds of product sold most"
                 subtitle={`Sales split across your product groups in ${report.label}.`}
               />

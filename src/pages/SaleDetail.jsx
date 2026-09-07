@@ -15,7 +15,16 @@ import { DetailItem, DetailList } from '../components/ui/DetailList'
 import RecordNotFound from '../components/ui/RecordNotFound'
 import { useData } from '../context/DataContext'
 import { useToast } from '../components/ToastProvider'
-import { customerName, getBatch, getCustomer, getSale, licenceStatus, productName, productUnit } from '../utils/selectors'
+import {
+  customerName,
+  employeeName,
+  getBatch,
+  getCustomer,
+  getSale,
+  licenceStatus,
+  productName,
+  productUnit,
+} from '../utils/selectors'
 import { formatDate, formatMoney, formatNumber, TODAY } from '../utils/format'
 
 export default function SaleDetail() {
@@ -147,6 +156,30 @@ export default function SaleDetail() {
                   ) : null}
                 </DetailItem>
                 <DetailItem label="Total amount">{formatMoney(sale.totalAmount)}</DetailItem>
+                <DetailItem label="Booked by">
+                  {sale.bookedBy ? (
+                    <Link
+                      to={`/employees/${sale.bookedBy}`}
+                      className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+                    >
+                      {employeeName(data, sale.bookedBy)}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">Not recorded</span>
+                  )}
+                </DetailItem>
+                <DetailItem label="Delivered by">
+                  {sale.deliveredBy ? (
+                    <Link
+                      to={`/employees/${sale.deliveredBy}`}
+                      className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+                    >
+                      {employeeName(data, sale.deliveredBy)}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">Not recorded</span>
+                  )}
+                </DetailItem>
               </DetailList>
             </CardBody>
           </Card>

@@ -4,6 +4,7 @@ const TONES = {
   red: 'bg-red-100 text-red-800 border-red-200',
   slate: 'bg-slate-100 text-slate-700 border-slate-200',
   blue: 'bg-sky-100 text-sky-800 border-sky-200',
+  violet: 'bg-violet-100 text-violet-800 border-violet-200',
 }
 
 export default function Badge({ children, tone = 'slate', icon: Icon, className = '' }) {

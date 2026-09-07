@@ -21,6 +21,8 @@ import {
   getCustomer,
   getProduct,
   licenceStatus,
+  peopleWhoBookSales,
+  peopleWhoDeliver,
   planAllocation,
   productSellableQty,
 } from '../utils/selectors'
@@ -46,6 +48,8 @@ export default function SaleNew() {
   const [customerId, setCustomerId] = useState('')
   const [saleDate, setSaleDate] = useState(TODAY)
   const [paymentStatus, setPaymentStatus] = useState('paid')
+  const [bookedBy, setBookedBy] = useState('')
+  const [deliveredBy, setDeliveredBy] = useState('')
   const [items, setItems] = useState([emptyItem(1)])
   const [errors, setErrors] = useState({ customerId: null, saleDate: null, items: [{}] })
   const [submitted, setSubmitted] = useState(false)
@@ -258,7 +262,7 @@ export default function SaleNew() {
     })
 
     setSaved(true)
-    data.recordSale({ customerId, saleDate, paymentStatus, items: saleItems })
+    data.recordSale({ customerId, saleDate, paymentStatus, bookedBy, deliveredBy, items: saleItems })
 
     const units = saleItems.reduce((total, item) => total + item.qty, 0)
     showToast('Sale recorded', {
@@ -368,6 +372,38 @@ export default function SaleNew() {
                   onChange={(event) => setSaleDate(event.target.value)}
                   error={errors.saleDate}
                 />
+              </Field>
+
+              {/* Who did what. Left empty the invoice still works — it simply
+                  counts towards the company total and nobody's own figure. */}
+              <Field
+                label="Booked by"
+                htmlFor="bookedBy"
+                hint="The person who took this order. Their sales target is measured on it."
+              >
+                <Select id="bookedBy" value={bookedBy} onChange={(event) => setBookedBy(event.target.value)}>
+                  <option value="">Not recorded</option>
+                  {peopleWhoBookSales(data).map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name} — {person.designation}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field
+                label="Delivered by"
+                htmlFor="deliveredBy"
+                hint="Who takes the goods out. Worth filling in when a customer says an order never arrived."
+              >
+                <Select id="deliveredBy" value={deliveredBy} onChange={(event) => setDeliveredBy(event.target.value)}>
+                  <option value="">Not recorded</option>
+                  {peopleWhoDeliver(data).map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name} — {person.designation}
+                    </option>
+                  ))}
+                </Select>
               </Field>
 
               <Field

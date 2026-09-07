@@ -38,6 +38,7 @@ import Investors from './pages/Investors'
 import Targets from './pages/Targets'
 import Employees from './pages/Employees'
 import EmployeeForm from './pages/EmployeeForm'
+import EmployeeDetail from './pages/EmployeeDetail'
 
 /* A data router (rather than plain <BrowserRouter>) so forms can block
    navigation when they have unsaved work in them. Exported separately from the
@@ -89,6 +90,7 @@ export const routes = createRoutesFromElements(
 
         <Route path="/employees" element={<Employees />} />
         <Route path="/employees/new" element={<EmployeeForm />} />
+        <Route path="/employees/:id" element={<EmployeeDetail />} />
         <Route path="/employees/:id/edit" element={<EmployeeForm />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

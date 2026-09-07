@@ -1,4 +1,5 @@
 import { TODAY, byDateDesc, daysUntil, lastNDays, roundMoney } from './format'
+import { advanceOutstanding, monthOf, payrollFor } from './payroll'
 
 /**
  * Read-only views over the in-memory store. Everything a screen needs is
@@ -18,6 +19,7 @@ export const getProduct = (data, id) => byId(data.products, id)
 export const getGroup = (data, id) => byId(data.productGroups, id)
 export const getBatch = (data, id) => byId(data.stockBatches, id)
 export const getEmployee = (data, id) => byId(data.employees, id)
+export const employeeName = (data, id) => (getEmployee(data, id) || {}).name || 'Unknown person'
 export const getPurchase = (data, id) => byId(data.purchases, id)
 export const getSale = (data, id) => byId(data.sales, id)
 
@@ -332,15 +334,84 @@ export function payables(data) {
 
 export const sumAmount = (rows) => roundMoney(rows.reduce((total, row) => total + row.amount, 0))
 
-/** Has this employee already been paid for the current (reference) month? */
-export function salaryPaidThisMonth(data, employeeId) {
-  const month = TODAY.slice(0, 7)
-  return data.cashEntries.some(
-    (entry) =>
-      entry.referenceType === 'salary' &&
-      entry.referenceId === employeeId &&
-      entry.entryDate.slice(0, 7) === month,
+/* ---------------------------------------------------------------- */
+/* People                                                            */
+/* ---------------------------------------------------------------- */
+
+/** Where this month's pay stands for one person. */
+export function salaryStatus(data, employeeId, month = monthOf(TODAY)) {
+  const employee = getEmployee(data, employeeId)
+  if (!employee) return null
+  return payrollFor(employee, data.salaryPayments, month)
+}
+
+/** Advances handed to this person and not yet taken back. */
+export function advanceHeld(data, employeeId) {
+  return advanceOutstanding(employeeId, data.salaryPayments)
+}
+
+/** Every payroll record for one person, newest first. */
+export function payrollHistory(data, employeeId) {
+  return data.salaryPayments
+    .filter((row) => row.employeeId === employeeId)
+    .slice()
+    .sort((a, b) => (a.entryDate === b.entryDate ? (a.id < b.id ? 1 : -1) : a.entryDate < b.entryDate ? 1 : -1))
+}
+
+/** The people a sale screen may offer for a given duty. */
+export const peopleWhoBookSales = (data) =>
+  data.employees.filter((e) => e.booksSales && e.status !== 'left')
+
+export const peopleWhoDeliver = (data) =>
+  data.employees.filter((e) => e.delivers && e.status !== 'left')
+
+/** Live invoices this person booked, newest first. */
+export function salesBookedBy(data, employeeId) {
+  return activeSales(data)
+    .filter((sale) => sale.bookedBy === employeeId)
+    .sort((a, b) => (a.saleDate === b.saleDate ? 0 : a.saleDate < b.saleDate ? 1 : -1))
+}
+
+/** Live invoices this person delivered, newest first. */
+export function salesDeliveredBy(data, employeeId) {
+  return activeSales(data)
+    .filter((sale) => sale.deliveredBy === employeeId)
+    .sort((a, b) => (a.saleDate === b.saleDate ? 0 : a.saleDate < b.saleDate ? 1 : -1))
+}
+
+/**
+ * What one person sold in one month.
+ *
+ * This is what makes a target for a person mean anything. A sale that was never
+ * attributed to anybody counts towards the company figure but towards nobody's
+ * own — which is the honest answer, not a guess.
+ */
+export function soldByInMonth(data, employeeId, month) {
+  return roundMoney(
+    activeSales(data)
+      .filter((sale) => sale.bookedBy === employeeId && sale.saleDate.slice(0, 7) === month)
+      .reduce((total, sale) => total + sale.totalAmount, 0),
   )
+}
+
+/** Every seller's total for a month, biggest first, for the league table. */
+export function salesByPerson(data, month) {
+  const totals = new Map()
+  for (const sale of activeSales(data)) {
+    if (sale.saleDate.slice(0, 7) !== month) continue
+    const key = sale.bookedBy || 'unattributed'
+    totals.set(key, roundMoney((totals.get(key) || 0) + sale.totalAmount))
+  }
+  return [...totals.entries()]
+    .map(([employeeId, amount]) => ({
+      employeeId: employeeId === 'unattributed' ? null : employeeId,
+      name:
+        employeeId === 'unattributed'
+          ? 'Not attributed to anyone'
+          : (getEmployee(data, employeeId) || {}).name || 'Unknown',
+      amount,
+    }))
+    .sort((a, b) => b.amount - a.amount)
 }
 
 /* ---------------------------------------------------------------- */

@@ -10,7 +10,7 @@ import Badge from '../components/ui/Badge'
 import { Field, FormActions, InlineNote, NumberInput, Select, TextInput } from '../components/ui/Field'
 import { useData } from '../context/DataContext'
 import { useToast } from '../components/ToastProvider'
-import { activeSales, getEmployee } from '../utils/selectors'
+import { activeSales, getEmployee, peopleWhoBookSales, soldByInMonth } from '../utils/selectors'
 import { formatMoney, formatMonth, roundMoney, TODAY } from '../utils/format'
 
 /**
@@ -40,10 +40,13 @@ export default function Targets() {
       [...data.targets]
         .sort((a, b) => (a.month === b.month ? a.scope.localeCompare(b.scope) : a.month < b.month ? 1 : -1))
         .map((target) => {
-          // The company figure is real. A person's share of it is not tracked
-          // per salesperson yet, so their achievement is shown as unknown
-          // rather than invented.
-          const actual = target.scope === 'company' ? soldInMonth.get(target.month) || 0 : null
+          /* Both figures are real now. A company target counts every live
+             invoice for the month; a person's target counts only the invoices
+             booked in their name. */
+          const actual =
+            target.scope === 'company'
+              ? soldInMonth.get(target.month) || 0
+              : soldByInMonth(data, target.employeeId, target.month)
           const percent = actual !== null && target.amount ? Math.round((actual / target.amount) * 100) : null
           return {
             ...target,
@@ -139,7 +142,7 @@ export default function Targets() {
                     onChange={(event) => setForm((f) => ({ ...f, employeeId: event.target.value }))}
                   >
                     <option value="">Choose someone…</option>
-                    {data.employees.map((employee) => (
+                    {peopleWhoBookSales(data).map((employee) => (
                       <option key={employee.id} value={employee.id}>
                         {employee.name} — {employee.designation}
                       </option>
@@ -203,12 +206,7 @@ export default function Targets() {
                 key: 'actual',
                 header: 'Actually sold',
                 align: 'right',
-                render: (r) =>
-                  r.actual === null ? (
-                    <span className="text-slate-400">Not tracked per person yet</span>
-                  ) : (
-                    <span className="font-bold tabular-nums">{formatMoney(r.actual)}</span>
-                  ),
+                render: (r) => <span className="font-bold tabular-nums">{formatMoney(r.actual)}</span>,
               },
               {
                 key: 'progress',
@@ -256,9 +254,10 @@ export default function Targets() {
         </Card>
 
         <InlineNote icon={Info}>
-          Company targets are measured against real sales. Per-person targets are recorded, but the system does not yet
-          know which salesperson made each sale — that needs a salesperson on the sale, which is a small change to the
-          sale screen.
+          Every target here is measured against real invoices. A company target counts all of them; a person's target
+          counts only the ones booked in their name on the sale screen. A sale left unattributed still counts towards
+          the company figure, but towards nobody's own — so if a person's number looks low, check that their invoices
+          were booked to them.
         </InlineNote>
       </PageBody>
     </>

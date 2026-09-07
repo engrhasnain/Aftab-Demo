@@ -12,6 +12,7 @@
  */
 
 import { calcLine, calcTotals } from '../utils/tax'
+import { cashOutForPayroll } from '../utils/payroll'
 
 export const REFERENCE_DATE = '2025-06-15'
 
@@ -306,15 +307,47 @@ export const products = [
 /* Employees                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The team.
+ *
+ * `booksSales` marks the people who take orders, and `delivers` the people who
+ * take the goods out. Those two flags are what the sale screen offers in its
+ * "Booked by" and "Delivered by" lists, so an accounts assistant is never
+ * offered as the person who drove the van.
+ *
+ * Somebody who leaves is marked `left` rather than removed. They drop out of
+ * the wage bill and can no longer be paid, but every invoice and delivery they
+ * handled still carries their name — history is not rewritten because a person
+ * moved on.
+ */
 export const employees = [
-  { id: 'emp-01', code: 9000, name: 'Ahmed Khan', designation: 'Sales Officer', monthlySalary: 65000 },
-  { id: 'emp-02', code: 9001, name: 'Bilal Hussain', designation: 'Delivery Driver', monthlySalary: 45000 },
-  { id: 'emp-03', code: 9002, name: 'Fatima Noor', designation: 'Accounts Assistant', monthlySalary: 55000 },
-  { id: 'emp-04', code: 9003, name: 'Usman Tariq', designation: 'Warehouse Supervisor', monthlySalary: 60000 },
-  { id: 'emp-05', code: 9004, name: 'Sana Iqbal', designation: 'Order Booker', monthlySalary: 48000 },
-  { id: 'emp-06', code: 9005, name: 'Imran Shah', designation: 'Sales Manager', monthlySalary: 110000 },
-  { id: 'emp-07', code: 9006, name: 'Rizwan Ali', designation: 'Loader', monthlySalary: 32000 },
-  { id: 'emp-08', code: 9007, name: 'Ayesha Malik', designation: 'Office Assistant', monthlySalary: 38000 },
+  { id: 'emp-01', code: 9000, name: 'Ahmed Khan', designation: 'Sales Officer', monthlySalary: 65000,
+    phone: '0300-2214-091', cnic: '42101-8837291-5', address: 'House 14, Block 6, PECHS, Karachi',
+    joinedDate: '2021-03-01', leftDate: null, status: 'active', booksSales: true, delivers: false },
+  { id: 'emp-02', code: 9001, name: 'Bilal Hussain', designation: 'Delivery Driver', monthlySalary: 45000,
+    phone: '0321-4470-882', cnic: '42201-1129043-7', address: 'Street 9, Korangi No. 4, Karachi',
+    joinedDate: '2022-07-15', leftDate: null, status: 'active', booksSales: false, delivers: true },
+  { id: 'emp-03', code: 9002, name: 'Fatima Noor', designation: 'Accounts Assistant', monthlySalary: 55000,
+    phone: '0333-2086-514', cnic: '42301-5560218-2', address: 'Flat 302, Gulshan-e-Iqbal Block 13, Karachi',
+    joinedDate: '2020-11-02', leftDate: null, status: 'active', booksSales: false, delivers: false },
+  { id: 'emp-04', code: 9003, name: 'Usman Tariq', designation: 'Warehouse Supervisor', monthlySalary: 60000,
+    phone: '0345-3391-760', cnic: '42101-7714806-3', address: 'House 88, Sector 15-A, Korangi, Karachi',
+    joinedDate: '2019-06-10', leftDate: null, status: 'active', booksSales: false, delivers: false },
+  { id: 'emp-05', code: 9004, name: 'Sana Iqbal', designation: 'Order Booker', monthlySalary: 48000,
+    phone: '0301-8845-236', cnic: '35202-2298175-8', address: 'House 5, Faisal Town C Block, Lahore',
+    joinedDate: '2023-01-16', leftDate: null, status: 'active', booksSales: true, delivers: false },
+  { id: 'emp-06', code: 9005, name: 'Imran Shah', designation: 'Sales Manager', monthlySalary: 110000,
+    phone: '0300-8210-447', cnic: '42000-3345901-1', address: 'House 27, Phase 5 DHA, Karachi',
+    joinedDate: '2018-02-05', leftDate: null, status: 'active', booksSales: true, delivers: false },
+  { id: 'emp-07', code: 9006, name: 'Rizwan Ali', designation: 'Loader', monthlySalary: 32000,
+    phone: '0312-6673-190', cnic: '42401-9902337-6', address: 'Quarters 12, Landhi No. 6, Karachi',
+    joinedDate: '2023-09-01', leftDate: null, status: 'active', booksSales: false, delivers: false },
+  { id: 'emp-08', code: 9007, name: 'Ayesha Malik', designation: 'Office Assistant', monthlySalary: 38000,
+    phone: '0334-1157-628', cnic: '42101-4408852-4', address: 'House 41, Nazimabad No. 3, Karachi',
+    joinedDate: '2024-04-22', leftDate: null, status: 'active', booksSales: false, delivers: false },
+  { id: 'emp-09', code: 9008, name: 'Kamran Aslam', designation: 'Delivery Driver', monthlySalary: 42000,
+    phone: '0306-7719-455', cnic: '42501-6620194-9', address: 'Street 3, Shah Faisal Colony, Karachi',
+    joinedDate: '2022-02-14', leftDate: '2025-05-31', status: 'left', booksSales: false, delivers: true },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -414,28 +447,28 @@ const purchaseSeeds = [
 
 const saleSeeds = [
   {
-    id: 'sal-2001', customerId: 'cus-01', saleDate: '2025-05-05', paymentStatus: 'paid',
+    id: 'sal-2001', customerId: 'cus-01', saleDate: '2025-05-05', paymentStatus: 'paid', bookedBy: 'emp-01', deliveredBy: 'emp-09',
     items: [
       { productId: 'prd-01', batchNumber: 'BCW-2404', qty: 30, unitPrice: 855 },
       { productId: 'prd-02', batchNumber: 'BCR-2404', qty: 25, unitPrice: 855 },
     ],
   },
   {
-    id: 'sal-2002', customerId: 'cus-02', saleDate: '2025-05-09', paymentStatus: 'paid',
+    id: 'sal-2002', customerId: 'cus-02', saleDate: '2025-05-09', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-09',
     items: [
       { productId: 'prd-04', batchNumber: 'NS1-2404', qty: 20, unitPrice: 2205 },
       { productId: 'prd-05', batchNumber: 'NS2-2404', qty: 15, unitPrice: 2142 },
     ],
   },
   {
-    id: 'sal-2003', customerId: 'cus-03', saleDate: '2025-05-13', paymentStatus: 'unpaid',
+    id: 'sal-2003', customerId: 'cus-03', saleDate: '2025-05-13', paymentStatus: 'unpaid', bookedBy: 'emp-01', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-04', batchNumber: 'NS1-2404', qty: 12, unitPrice: 2205 },
       { productId: 'prd-03', batchNumber: 'BCF-2404', qty: 20, unitPrice: 468 },
     ],
   },
   {
-    id: 'sal-2004', customerId: 'cus-04', saleDate: '2025-05-17', paymentStatus: 'paid',
+    id: 'sal-2004', customerId: 'cus-04', saleDate: '2025-05-17', paymentStatus: 'paid', bookedBy: 'emp-06', deliveredBy: 'emp-09',
     items: [
       { productId: 'prd-07', batchNumber: 'DS5-2405', qty: 60, unitPrice: 702 },
       { productId: 'prd-09', batchNumber: 'ACV5-2505', qty: 50, unitPrice: 621 },
@@ -443,7 +476,7 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2005', customerId: 'cus-05', saleDate: '2025-05-21', paymentStatus: 'paid',
+    id: 'sal-2005', customerId: 'cus-05', saleDate: '2025-05-21', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-08', batchNumber: 'DS1-2405', qty: 40, unitPrice: 1278 },
       { productId: 'prd-10', batchNumber: 'ACV1-2505', qty: 45, unitPrice: 1125 },
@@ -451,35 +484,35 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2006', customerId: 'cus-06', saleDate: '2025-05-24', paymentStatus: 'paid',
+    id: 'sal-2006', customerId: 'cus-06', saleDate: '2025-05-24', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-09',
     items: [
       { productId: 'prd-05', batchNumber: 'NS2-2404', qty: 18, unitPrice: 2142 },
       { productId: 'prd-12', batchNumber: 'GW3-2505', qty: 15, unitPrice: 1935 },
     ],
   },
   {
-    id: 'sal-2007', customerId: 'cus-07', saleDate: '2025-05-28', paymentStatus: 'paid',
+    id: 'sal-2007', customerId: 'cus-07', saleDate: '2025-05-28', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-11', batchNumber: 'LO-2505', qty: 30, unitPrice: 1062 },
       { productId: 'prd-13', batchNumber: 'AJP-2505', qty: 25, unitPrice: 1485 },
     ],
   },
   {
-    id: 'sal-2008', customerId: 'cus-08', saleDate: '2025-06-02', paymentStatus: 'paid',
+    id: 'sal-2008', customerId: 'cus-08', saleDate: '2025-06-02', paymentStatus: 'paid', bookedBy: 'emp-01', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-06', batchNumber: 'NS1L-2505', qty: 18, unitPrice: 4482 },
       { productId: 'prd-04', batchNumber: 'NS1-2404', qty: 25, unitPrice: 2205 },
     ],
   },
   {
-    id: 'sal-2009', customerId: 'cus-09', saleDate: '2025-06-09', paymentStatus: 'unpaid',
+    id: 'sal-2009', customerId: 'cus-09', saleDate: '2025-06-09', paymentStatus: 'unpaid', bookedBy: 'emp-05', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-14', batchNumber: 'SCV-2505', qty: 70, unitPrice: 378 },
       { productId: 'prd-09', batchNumber: 'ACV5-2505', qty: 60, unitPrice: 621 },
     ],
   },
   {
-    id: 'sal-2010', customerId: 'cus-10', saleDate: '2025-06-10', paymentStatus: 'paid',
+    id: 'sal-2010', customerId: 'cus-10', saleDate: '2025-06-10', paymentStatus: 'paid', bookedBy: 'emp-06', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-01', batchNumber: 'BCW-2505', qty: 70, unitPrice: 855 },
       { productId: 'prd-02', batchNumber: 'BCR-2404', qty: 45, unitPrice: 855 },
@@ -487,7 +520,7 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2011', customerId: 'cus-01', saleDate: '2025-06-11', paymentStatus: 'paid',
+    id: 'sal-2011', customerId: 'cus-01', saleDate: '2025-06-11', paymentStatus: 'paid', bookedBy: 'emp-01', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-07', batchNumber: 'DS5-2405', qty: 55, unitPrice: 702 },
       { productId: 'prd-08', batchNumber: 'DS1-2405', qty: 30, unitPrice: 1278 },
@@ -495,14 +528,14 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2012', customerId: 'cus-05', saleDate: '2025-06-12', paymentStatus: 'paid',
+    id: 'sal-2012', customerId: 'cus-05', saleDate: '2025-06-12', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-04', batchNumber: 'NS1-2506', qty: 55, unitPrice: 2205 },
       { productId: 'prd-05', batchNumber: 'NS2-2506', qty: 50, unitPrice: 2142 },
     ],
   },
   {
-    id: 'sal-2013', customerId: 'cus-02', saleDate: '2025-06-13', paymentStatus: 'paid',
+    id: 'sal-2013', customerId: 'cus-02', saleDate: '2025-06-13', paymentStatus: 'paid', bookedBy: 'emp-05', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-01', batchNumber: 'BCW-2505', qty: 50, unitPrice: 855 },
       { productId: 'prd-11', batchNumber: 'LO-2505', qty: 35, unitPrice: 1062 },
@@ -511,7 +544,7 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2014', customerId: 'cus-03', saleDate: '2025-06-14', paymentStatus: 'paid',
+    id: 'sal-2014', customerId: 'cus-03', saleDate: '2025-06-14', paymentStatus: 'paid', bookedBy: 'emp-01', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-06', batchNumber: 'NS1L-2505', qty: 12, unitPrice: 4482 },
       { productId: 'prd-12', batchNumber: 'GW3-2412', qty: 20, unitPrice: 1935 },
@@ -521,7 +554,7 @@ const saleSeeds = [
     ],
   },
   {
-    id: 'sal-2015', customerId: 'cus-08', saleDate: '2025-06-15', paymentStatus: 'paid',
+    id: 'sal-2015', customerId: 'cus-08', saleDate: '2025-06-15', paymentStatus: 'paid', bookedBy: 'emp-01', deliveredBy: 'emp-02',
     items: [
       { productId: 'prd-02', batchNumber: 'BCR-2506', qty: 90, unitPrice: 855 },
       { productId: 'prd-15', batchNumber: 'BPB-2506', qty: 45, unitPrice: 432 },
@@ -619,14 +652,46 @@ export const sopDocuments = [
   { id: 'sop-06', code: 'SOP-DL-06', title: 'Delivery and proof of receipt', category: 'Distribution', version: '1.1', effectiveDate: '2025-05-01', reviewDate: '2026-05-01', owner: 'Bilal Hussain', summary: 'Loading checks, signed delivery notes, and what happens when a customer refuses part of a delivery.' },
 ]
 
-/* Salary payments already made this cycle. The employees not listed here are
-   deliberately left unpaid so the "Record salary payment" flow has something
-   real to do during the demo. */
-const salaryPaymentSeeds = [
-  { employeeId: 'emp-01', entryDate: '2025-06-01' },
-  { employeeId: 'emp-02', entryDate: '2025-06-01' },
-  { employeeId: 'emp-05', entryDate: '2025-06-01' },
-  { employeeId: 'emp-07', entryDate: '2025-06-01' },
+/**
+ * Payroll.
+ *
+ * A month's pay is not one button any more. Three kinds of record share this
+ * list, and `kind` says which is which:
+ *
+ *   adjustment — changes what is owed for the month. Positive for overtime or a
+ *                bonus, negative for days not worked.
+ *   advance    — money handed over before payday (peshgi). It leaves the cash
+ *                box now and is taken back out of a later payment.
+ *   salary     — a payment against the month's dues. `amount` is how much of
+ *                those dues it clears; `advanceRecovered` is the part of that
+ *                taken back against an outstanding advance rather than paid in
+ *                cash. Cash actually leaving = amount - advanceRecovered.
+ *
+ * Because a payment clears part of the dues rather than all of them, the same
+ * month can be paid in instalments — which is how most of this trade runs.
+ *
+ * The seeded month is deliberately mixed: two people paid in full, one part
+ * paid, one paid with an advance taken back, one owed overtime, one docked for
+ * absence, one holding an advance nobody has recovered yet, and the rest still
+ * to pay. Every state the screen can show is on screen from the start.
+ */
+export const salaryPayments = [
+  { id: 'pay-001', employeeId: 'emp-07', month: '2025-06', entryDate: '2025-05-20', kind: 'advance',
+    amount: 10000, advanceRecovered: 0, note: 'Advance before Eid' },
+  { id: 'pay-002', employeeId: 'emp-04', month: '2025-06', entryDate: '2025-06-01', kind: 'adjustment',
+    amount: 5000, advanceRecovered: 0, note: 'Overtime — two Sundays on stock count' },
+  { id: 'pay-003', employeeId: 'emp-08', month: '2025-06', entryDate: '2025-06-01', kind: 'adjustment',
+    amount: -3000, advanceRecovered: 0, note: 'Two days absent without leave' },
+  { id: 'pay-004', employeeId: 'emp-01', month: '2025-06', entryDate: '2025-06-01', kind: 'salary',
+    amount: 65000, advanceRecovered: 0, note: 'Paid in full' },
+  { id: 'pay-005', employeeId: 'emp-02', month: '2025-06', entryDate: '2025-06-01', kind: 'salary',
+    amount: 45000, advanceRecovered: 0, note: 'Paid in full' },
+  { id: 'pay-006', employeeId: 'emp-07', month: '2025-06', entryDate: '2025-06-01', kind: 'salary',
+    amount: 32000, advanceRecovered: 10000, note: 'Advance of Rs 10,000 taken back' },
+  { id: 'pay-007', employeeId: 'emp-05', month: '2025-06', entryDate: '2025-06-01', kind: 'salary',
+    amount: 25000, advanceRecovered: 0, note: 'Part payment — rest at month end' },
+  { id: 'pay-008', employeeId: 'emp-03', month: '2025-06', entryDate: '2025-06-10', kind: 'advance',
+    amount: 15000, advanceRecovered: 0, note: 'Advance for school fees' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -735,6 +800,8 @@ export const sales = saleSeeds.map((sale) => {
     customerId: sale.customerId,
     saleDate: sale.saleDate,
     paymentStatus: sale.paymentStatus,
+    bookedBy: sale.bookedBy || null,
+    deliveredBy: sale.deliveredBy || null,
     status: 'active',
     items,
     subtotal: totals.subtotal,
@@ -811,15 +878,20 @@ for (const expense of expenses) {
   })
 }
 
-for (const payment of salaryPaymentSeeds) {
+/* An adjustment moves no money — it only changes what is owed. An advance and a
+   salary payment both empty the cash box, a salary payment by whatever is left
+   after an advance has been taken back out of it. */
+for (const payment of salaryPayments) {
+  const cashOut = cashOutForPayroll(payment)
+  if (!cashOut) continue
   const employee = employeeById(payment.employeeId)
   unsortedCashEntries.push({
     entryDate: payment.entryDate,
     direction: 'out',
-    amount: employee.monthlySalary,
+    amount: cashOut,
     referenceType: 'salary',
     referenceId: employee.id,
-    note: 'Salary — ' + employee.name,
+    note: (payment.kind === 'advance' ? 'Salary advance — ' : 'Salary — ') + employee.name,
   })
 }
 
@@ -839,6 +911,7 @@ export const seedData = {
   purchases,
   sales,
   employees,
+  salaryPayments,
   cashEntries,
   adjustments,
   expenses,
