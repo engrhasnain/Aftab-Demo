@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* The design mandate asks for a 16px base, not the usual 14px of dense
+       business software. Everything else scales from here. */
+    font-size: 16px;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+    font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  /* Always-visible, high contrast focus ring — this app may be driven with a
+     keyboard by people who are not confident with a mouse. */
+  :focus-visible {
+    @apply outline-none ring-4 ring-brand-500/40 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  .field-input {
+    @apply w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900
+           placeholder:text-slate-400 transition
+           focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-500/20
+           disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500;
+  }
+
+  .field-input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-500/20;
+  }
+}
+
+/*
+ * When the layout flips to Urdu, any sentence still in English has to keep its
+ * own direction. Without this the browser treats "How it works." as Arabic-script
+ * text and moves the full stop to the front — ".How it works" — which is what
+ * makes a half-translated page look broken rather than merely untranslated.
+ *
+ * `plaintext` asks the browser to decide direction per block from its first real
+ * letter, so Urdu reads right-to-left and English reads left-to-right, on the
+ * same page.
+ */
+[dir='rtl'] :is(h1, h2, h3, h4, p, li, dt, dd, label, th, td, figcaption, blockquote) {
+  unicode-bidi: plaintext;
+}
+
+/*
+ * Printing. A printed invoice must not carry the app's furniture — no sidebar,
+ * no buttons, no colour that costs ink and says nothing on paper.
+ */
+@media print {
+  .no-print,
+  aside,
+  header.sticky {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    font-size: 11pt;
+  }
+
+  .print-root {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .sheet {
+    box-shadow: none !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* Never split a line item across two pages. */
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+/* Keep the print/scroll behaviour of wide tables contained rather than letting
+   the whole page scroll sideways. */
+.table-scroll {
+  overflow-x: auto;
+}
